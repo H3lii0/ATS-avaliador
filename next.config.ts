@@ -42,10 +42,14 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
   serverExternalPackages,
-  // pdf-parse loads PDF.js' worker dynamically at runtime. Explicitly include
-  // it in serverless output so production deployments do not omit the file.
+  // Runtime imports are invisible to file tracing. Include canvas' JS files
+  // and the installed Linux native binding as well as the PDF.js worker.
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+    "/api/analisar": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/@napi-rs/canvas/**/*",
+      "./node_modules/@napi-rs/canvas-linux-*/**/*",
+    ],
   },
 };
 
