@@ -48,7 +48,7 @@ Páginas que exigem login, carregam o conteúdo exclusivamente com JavaScript ou
 
 ## Executar localmente
 
-Requisitos: Node.js 20 ou superior e npm.
+Requisitos: Node.js 22.x e npm. O projeto usa essa versão para manter o runtime da Vercel consistente com o leitor de PDF (`pdfjs-dist`).
 
 ```bash
 npm install

@@ -39,6 +39,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // pdf-parse loads PDF.js' worker dynamically at runtime. Explicitly include
+  // it in serverless output so production deployments do not omit the file.
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
 };
 
 export default nextConfig;
