@@ -7,6 +7,22 @@ import { MAX_RESUME_FILE_SIZE_BYTES, MAX_RESUME_FILE_SIZE_MB } from "./limits";
 
 const MAX_PDF_PAGES = 20;
 
+async function configurePdfRuntime() {
+  if (process.env.VERCEL !== "1") return;
+
+  // Keep the native canvas import out of the Turbopack ESM graph. Vercel
+  // loads it from the external Node.js package at runtime.
+  const dynamicImport = new Function("specifier", "return import(specifier)") as (
+    specifier: string,
+  ) => Promise<typeof import("@napi-rs/canvas")>;
+  const canvas = await dynamicImport("@napi-rs/canvas");
+  const runtime = globalThis as unknown as Record<string, unknown>;
+
+  runtime.DOMMatrix ??= canvas.DOMMatrix;
+  runtime.ImageData ??= canvas.ImageData;
+  runtime.Path2D ??= canvas.Path2D;
+}
+
 function configurePdfWorker(PDFParse: typeof import("pdf-parse").PDFParse) {
   const workerPath = join(
     process.cwd(),
@@ -58,6 +74,7 @@ export async function extractText(file: File) {
       throw new PublicError("O arquivo não possui uma estrutura PDF válida.", 422);
     }
 
+    await configurePdfRuntime();
     const { PDFParse } = await import("pdf-parse");
     configurePdfWorker(PDFParse);
     const parser = new PDFParse({ data: bytes });
