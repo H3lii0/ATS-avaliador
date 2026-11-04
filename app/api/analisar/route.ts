@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { NextResponse } from "next/server";
 import { analyzeResume } from "@/lib/analyzer";
 import type { AnalysisMode } from "@/lib/analyzer";
@@ -12,21 +14,37 @@ export const maxDuration = 20;
 
 const MAX_JOB_DESCRIPTION_LENGTH = 30_000;
 
+function errorDetails(error: unknown) {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message, stack: error.stack };
+  }
+  return { name: "UnknownError", message: String(error) };
+}
+
 export async function POST(request: Request) {
+  const requestId = randomUUID();
+  let stage = "request.received";
+
   if (!requestSizeIsAllowed(request)) {
     return NextResponse.json(
-      { error: `A solicitação excede o limite permitido de ${MAX_REQUEST_SIZE_MB} MB.` },
-      { status: 413 },
+      { error: `A solicitação excede o limite permitido de ${MAX_REQUEST_SIZE_MB} MB.`, requestId },
+      { status: 413, headers: { "x-request-id": requestId } },
     );
   }
 
   const rateLimit = consumeRateLimit(request);
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: "Muitas análises foram solicitadas. Aguarde alguns minutos e tente novamente." },
+      {
+        error: "Muitas análises foram solicitadas. Aguarde alguns minutos e tente novamente.",
+        requestId,
+      },
       {
         status: 429,
-        headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+          "x-request-id": requestId,
+        },
       },
     );
   }
@@ -34,12 +52,16 @@ export async function POST(request: Request) {
   const releaseAnalysisSlot = acquireAnalysisSlot();
   if (!releaseAnalysisSlot) {
     return NextResponse.json(
-      { error: "O serviço está processando outras análises. Tente novamente em instantes." },
-      { status: 503, headers: { "Retry-After": "5" } },
+      {
+        error: "O serviço está processando outras análises. Tente novamente em instantes.",
+        requestId,
+      },
+      { status: 503, headers: { "Retry-After": "5", "x-request-id": requestId } },
     );
   }
 
   try {
+    stage = "request.formData";
     const formData = await request.formData();
     const file = formData.get("curriculo");
     const mode = String(formData.get("modo") ?? "ats") as AnalysisMode;
@@ -74,6 +96,7 @@ export async function POST(request: Request) {
       );
     }
     if (mode === "job" && jobSource === "url") {
+      stage = "job.fetch";
       if (!jobUrl || jobUrl.length > 2048) {
         return NextResponse.json({ error: "Informe um link de vaga válido." }, { status: 400 });
       }
@@ -81,6 +104,7 @@ export async function POST(request: Request) {
       jobDescription = extractedJob.text;
     }
 
+    stage = "resume.extract";
     const resumeText = await extractText(file);
     if (resumeText.trim().length < 100) {
       return NextResponse.json(
@@ -89,6 +113,7 @@ export async function POST(request: Request) {
       );
     }
 
+    stage = "resume.analyze";
     const analysis = analyzeResume(resumeText, mode, jobDescription);
     return NextResponse.json({
       ...analysis,
@@ -107,13 +132,33 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof PublicError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      console.warn(
+        "[analysis_public_error]",
+        JSON.stringify({ requestId, stage, status: error.status, message: error.message }),
+      );
+      return NextResponse.json(
+        { error: error.message, requestId },
+        { status: error.status, headers: { "x-request-id": requestId } },
+      );
     }
 
-    console.error("Falha interna durante a análise do currículo.", error);
+    console.error(
+      "[analysis_internal_error]",
+      JSON.stringify({
+        requestId,
+        stage,
+        nodeVersion: process.version,
+        platform: process.env.VERCEL ? "vercel" : process.platform,
+        cwd: process.cwd(),
+        error: errorDetails(error),
+      }),
+    );
     return NextResponse.json(
-      { error: "Não foi possível concluir a análise. Tente novamente em instantes." },
-      { status: 500 },
+      {
+        error: "Não foi possível concluir a análise. Tente novamente em instantes.",
+        requestId,
+      },
+      { status: 500, headers: { "x-request-id": requestId } },
     );
   } finally {
     releaseAnalysisSlot();

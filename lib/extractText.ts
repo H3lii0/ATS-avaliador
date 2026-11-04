@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
 
 import { PublicError } from "./publicError";
 import { MAX_RESUME_FILE_SIZE_BYTES, MAX_RESUME_FILE_SIZE_MB } from "./limits";
@@ -17,6 +18,9 @@ function configurePdfWorker(PDFParse: typeof import("pdf-parse").PDFParse) {
     "build",
     "pdf.worker.mjs",
   );
+  if (!existsSync(workerPath)) {
+    throw new Error(`PDF_WORKER_NOT_FOUND: ${workerPath}`);
+  }
   PDFParse.setWorker(pathToFileURL(workerPath).href);
 }
 

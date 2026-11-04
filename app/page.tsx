@@ -88,7 +88,10 @@ export default function Home() {
     try {
       const response = await fetch("/api/analisar", { method: "POST", body: data });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Falha na análise.");
+      if (!response.ok) {
+        const requestCode = payload.requestId ? ` (código: ${payload.requestId})` : "";
+        throw new Error(`${payload.error ?? "Falha na análise."}${requestCode}`);
+      }
       setResult(payload);
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
     } catch (caught) {
