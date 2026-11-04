@@ -157,6 +157,7 @@ export async function POST(request: Request) {
       {
         error: "Não foi possível concluir a análise. Tente novamente em instantes.",
         requestId,
+        diagnosticStage: stage,
       },
       { status: 500, headers: { "x-request-id": requestId } },
     );
