@@ -1,6 +1,6 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { existsSync } from "node:fs";
 
 import { PublicError } from "./publicError";
 import { MAX_RESUME_FILE_SIZE_BYTES, MAX_RESUME_FILE_SIZE_MB } from "./limits";
@@ -8,8 +8,6 @@ import { MAX_RESUME_FILE_SIZE_BYTES, MAX_RESUME_FILE_SIZE_MB } from "./limits";
 const MAX_PDF_PAGES = 20;
 
 function configurePdfWorker(PDFParse: typeof import("pdf-parse").PDFParse) {
-  // Build the path at runtime so Turbopack does not rewrite it to a virtual
-  // module path inside `.next`, where the worker file cannot be imported.
   const workerPath = join(
     process.cwd(),
     "node_modules",

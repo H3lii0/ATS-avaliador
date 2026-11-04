@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const serverExternalPackages = process.env.VERCEL === "1" ? ["pdf-parse", "@napi-rs/canvas"] : [];
+
 const scriptPolicy =
   process.env.NODE_ENV === "development"
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
@@ -39,6 +41,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  serverExternalPackages,
   // pdf-parse loads PDF.js' worker dynamically at runtime. Explicitly include
   // it in serverless output so production deployments do not omit the file.
   outputFileTracingIncludes: {
